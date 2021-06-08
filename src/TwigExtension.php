@@ -2,7 +2,10 @@
 
 namespace Drupal\format_strawberryfield;
 
+use Twig\Markup;
 use Twig\TwigTest;
+use Twig\TwigFilter;
+use Twig\TwigFunction;
 
 /**
  * Class TwigExtension.
@@ -34,8 +37,17 @@ class TwigExtension extends \Twig_Extension {
    */
   public function getFunctions() {
     return [
-      new \Twig_SimpleFunction('sbf_entity_ids_by_label',
+      new TwigFunction('sbf_entity_ids_by_label',
         [$this, 'entityIdsByLabel']),
+    ];
+  }
+
+  /**
+   * @inheritDoc
+   */
+  public function getFilters() {
+    return [
+      new TwigFilter('sbf_json_decode', [$this, 'sbfJsonDecode'])
     ];
   }
 
@@ -116,24 +128,31 @@ class TwigExtension extends \Twig_Extension {
   }
 
   /**
-   * @param  \Exception  $exception
-   * @param $entity_type
-   * @param $label
+   * JSON Decodes a string.
    *
-   * @return null
+   * To make this function safe we define a 64 max depth, always associative
+   * array and fail on non Valid UTF8. No user provided Bit Masks are allowed
+   *
+   * @param mixed $value the value to decode
+   *
+   * @return mixed The JSON decoded value
+   *    - NULL if failure, not the right type (e.g Iterable) or if NULL
+   *    - TRUE/FALSE
+   *    - An array
    */
-  private function catchException(\Exception $exception, $entity_type, $label) {
-    $message = t('@exception_type thrown in @file:@line while querying for @entity_type entity ids matching "@label". Message: @response',
-      [
-        '@exception_type' => get_class($exception),
-        '@file' => $exception->getFile(),
-        '@line' => $exception->getLine(),
-        '@entity_type' => $entity_type,
-        '@label' => $label,
-        '@response' => $exception->getMessage(),
-      ]);
-    \Drupal::logger('format_strawberryfield')->warning($message);
-    return NULL;
+  public function sbfJsonDecode($value) {
+    if ($value instanceof Markup) {
+      $value = (string) $value;
+    }
+    elseif (\is_iterable($value)) {
+      // Do not fail, return an empty array;
+      return NULL;
+    }
+    try {
+      return json_decode($value, TRUE, 64, JSON_INVALID_UTF8_IGNORE | JSON_OBJECT_AS_ARRAY);
+    } catch (\Exception $exception) {
+      return NULL;
+    }
   }
 
 }
