@@ -235,6 +235,7 @@
             canvasIds = manifest.json.items.map(
               item => item['id']
             );
+            console.log(manifest.json.items);
             currentDrupalNodeId = manifest.json.items.filter(item => {
               return item['id'] === canvasId
             }).map(item => {
@@ -281,6 +282,21 @@
             );
           }
 
+          // Build page parameter
+          const canvasIndices = visibleCanvases.map(c => canvasIds.indexOf(c) + 1)
+          if (view === 'single' || canvasIndices.length == 1) {
+            newParams.page = canvasIndices[0]
+          } else if (view === 'book') {
+            newParams.page = canvasIndices.find(e => !!e).join(',')
+          }
+          if(newParams.page !== undefined) {
+            let $fragment = 'page/' + newParams.page;
+            history.replaceState(
+              { searchParams: newParams },
+              '',
+              `${window.location.pathname}#${$fragment}`
+            );
+          }
           // Now at the end. If a VTT annotation requested a Canvas to be set. we need to check if we have in the config
           // A temporary stored valued of the last clicked annotation.
           // Use if here.
@@ -322,11 +338,20 @@
             `${window.location.pathname}#${$fragment}`
           );
         }
+        else if (action.type === ActionTypes.SET_CANVAS) {
+          console.log(newParams);
+          delete newParams.page
+          let $fragment = '';
+
+          // I don't know where to go from here...
+
+        }
 
 
 
       }
       function* rootSaga() {
+        console.log('rootSaga');
         yield effects.takeEvery(
           [
             ActionTypes.SET_CANVAS,
@@ -424,6 +449,28 @@
           const search_string = readFragmentSearch();
           if (search_string.length > 0 ) {
             $options.windows[0].defaultSearchQuery = search_string;
+          }
+
+          const readPageHash = function() {
+            const urlArray = window.location.hash.replace('#','').split('/');
+            const urlHash = {};
+            for (let i = 0; i < urlArray.length; i += 2) {
+              urlHash[urlArray[i]] = urlArray[i + 1];
+            }
+            if (urlHash['page'] != undefined) {
+              return decodeURIComponent(urlHash['page'].replace(/\+/g, " "));
+            }
+            else {
+              return '';
+            }
+          }
+
+          const page_string = readPageHash();
+          if (page_string.length > 0 ) {
+            console.log('Setting page to ' + page_string);
+            // Set up the canvas id.
+            // @TODO: This doesn't work. Need to figure out how to tell Mirador to display the corresponding canvas.
+            $options.windows[0].canvas = page_string;
           }
 
           // Allow last minute overrides. These are more complex bc we have windows as an array and window too.
